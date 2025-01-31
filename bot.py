@@ -3,13 +3,10 @@ import telebot
 from flask import Flask, request
 from datetime import datetime, timedelta
 
-# Получаем токен бота из переменной окружения
-TOKEN = os.getenv("TELEGRAM_TOKEN", "7937428133:AAHlZ911n2Wk8kJla3n28cgJ1zXzhxQWZCM")
-if not TOKEN:
-    raise ValueError("TELEGRAM_TOKEN не найден в переменных окружения!")
-
-# ID администратора (ваш ID)
-ADMIN_CHAT_ID = int(os.getenv("ADMIN_CHAT_ID", "6329950188"))
+# Встроенные переменные (НЕ БЕЗОПАСНО, но работает для тестов)
+TOKEN = "7937428133:AAHlZ911n2Wk8kJla3n28cgJ1zXzhxQWZCM"  # Токен вашего бота
+ADMIN_CHAT_ID = 6329950188  # Ваш Telegram ID
+WEBHOOK_URL = "https://telegram-bot-2ags.onrender.com/webhook"  # URL вашего Webhook
 
 # Создаем экземпляр бота
 bot = telebot.TeleBot(TOKEN)
@@ -267,13 +264,9 @@ def is_user_blocked(user_id):
 # Запуск сервера на Render
 if __name__ == "__main__":
     # Устанавливаем Webhook при запуске
-    WEBHOOK_URL = os.getenv("WEBHOOK_URL", "https://telegram-bot-2ags.onrender.com/webhook")
-    if not WEBHOOK_URL:
-        raise ValueError("WEBHOOK_URL не найден в переменных окружения!")
-
     bot.remove_webhook()
     bot.set_webhook(url=WEBHOOK_URL)
 
     # Запускаем Flask-сервер
-    port = int(os.getenv("PORT", 5000))
+    port = int(os.getenv("PORT", 10000))  # Используем порт 10000 по умолчанию
     app.run(host="0.0.0.0", port=port)

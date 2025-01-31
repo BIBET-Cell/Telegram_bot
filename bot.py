@@ -4,12 +4,12 @@ from flask import Flask, request
 from datetime import datetime, timedelta
 
 # Получаем токен бота из переменной окружения
-TOKEN = os.getenv("7937428133:AAHlZ911n2Wk8kJla3n28cgJ1zXzhxQWZCM")
+TOKEN = os.getenv("TELEGRAM_TOKEN", "7937428133:AAHlZ911n2Wk8kJla3n28cgJ1zXzhxQWZCM")
 if not TOKEN:
     raise ValueError("TELEGRAM_TOKEN не найден в переменных окружения!")
 
 # ID администратора (ваш ID)
-ADMIN_CHAT_ID = int(os.getenv("6329950188", "6329950188"))  # Ваш Telegram ID
+ADMIN_CHAT_ID = int(os.getenv("ADMIN_CHAT_ID", "6329950188"))
 
 # Создаем экземпляр бота
 bot = telebot.TeleBot(TOKEN)
@@ -222,58 +222,4 @@ def handle_message(message):
                 files.append(file)  # Добавляем файл в список
                 media_group.append(telebot.types.InputMediaPhoto(file, caption=PROOF_CAPTIONS[i]))
             except FileNotFoundError:
-                bot.send_message(message.chat.id, f"❌ File not found: {PROOF_SCREENSHOTS[i]}")
-                return
-
-        try:
-            bot.send_media_group(message.chat.id, media_group)
-        finally:
-            for file in files:  # Закрываем все файлы после отправки
-                file.close()
-
-    else:
-        bot.send_message(message.chat.id, "⚠️ Unknown command. Please use the buttons below.")
-
-# Функция для отслеживания активности пользователя
-def track_user_activity(user_id):
-    now = datetime.now()
-    if user_id not in user_activity:
-        user_activity[user_id] = {"messages": [], "blocked_until": None}
-
-    # Очищаем старые сообщения, которые выходят за пределы временного окна
-    user_activity[user_id]["messages"] = [
-        msg_time for msg_time in user_activity[user_id]["messages"]
-        if now - msg_time < timedelta(seconds=SPAM_TIME_WINDOW)
-    ]
-
-    # Добавляем текущее сообщение
-    user_activity[user_id]["messages"].append(now)
-
-    # Проверяем, не превышен ли лимит
-    if len(user_activity[user_id]["messages"]) > SPAM_LIMIT:
-        user_activity[user_id]["blocked_until"] = now + timedelta(seconds=BLOCK_TIME)
-
-# Функция для проверки, заблокирован ли пользователь
-def is_user_blocked(user_id):
-    if user_id not in user_activity:
-        return False
-
-    blocked_until = user_activity[user_id].get("blocked_until")
-    if blocked_until and datetime.now() < blocked_until:
-        return True
-
-    return False
-
-# Запуск сервера на Render
-if __name__ == "__main__":
-    # Устанавливаем Webhook при запуске
-    WEBHOOK_URL = os.getenv("https://telegram-bot-2ags.onrender.com")
-    if not WEBHOOK_URL:
-        raise ValueError("WEBHOOK_URL не найден в переменных окружения!")
-
-    bot.remove_webhook()
-    bot.set_webhook(url=WEBHOOK_URL)
-
-    # Запускаем Flask-сервер
-    port = int(os.getenv("PORT", 5000))
-    app.run(host="0.0.0.0", port=port)
+                bot.send_message(message.chat.id, f"❌ File not found: {PRO

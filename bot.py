@@ -1,9 +1,18 @@
-from telegram import Update, InputMediaPhoto, ReplyKeyboardMarkup, KeyboardButton
-from telegram.ext import ApplicationBuilder, CommandHandler, MessageHandler, filters, ContextTypes
+import telebot
+from flask import Flask, request
 from datetime import datetime, timedelta
 
 # Токен бота (замените на свой)
 TOKEN = '7937428133:AAHlZ911n2Wk8kJla3n28cgJ1zXzhxQWZCM'
+
+# ID администратора (ваш ID)
+ADMIN_CHAT_ID = 6329950188  # Ваш Telegram ID
+
+# Создаем экземпляр бота
+bot = telebot.TeleBot(TOKEN)
+
+# Создаем экземпляр Flask
+app = Flask(__name__)
 
 # Словарь для отслеживания активности пользователей
 user_activity = {}
@@ -13,36 +22,65 @@ SPAM_LIMIT = 10  # Максимальное количество сообщен�
 SPAM_TIME_WINDOW = 60  # Временное окно в секундах (1 минута)
 BLOCK_TIME = 300  # Время блокировки в секундах (5 минут)
 
-# Пути к скриншотам (замените на реальные пути к файлам)
-SCREENSHOTS = [
-    "screenshots/screenshot1.jpg",
-    "screenshots/screenshot2.jpg",
-    "screenshots/screenshot3.jpg",
-    "screenshots/screenshot4.jpg",
-    "screenshots/screenshot5.jpg"
+# Пути к скриншотам для кнопки "Reviews"
+REVIEWS_SCREENSHOTS = [
+    "screenshots/review1.jpg",
+    "screenshots/review2.jpg",
+    "screenshots/review3.jpg",
+    "screenshots/review4.jpg",
+    "screenshots/review5.jpg"
 ]
 
+# Пути к скриншотам для кнопки "Proof"
+PROOF_SCREENSHOTS = [
+    "screenshots/proof1.jpg",
+    "screenshots/proof2.jpg",
+    "screenshots/proof3.jpg"
+]
+
+# Подписи для кнопки "Proof"
+PROOF_CAPTIONS = [
+    "Screenshot 1: Exclusive content preview.",
+    "Screenshot 2: Daily updates section.",
+    "Screenshot 3: Cloud library access."
+]
+
+# Устанавливаем Webhook
+WEBHOOK_URL = 'https://telegram-bot-vpby.onrender.com/'  # Замените на URL вашего сервиса на Render
+
+@app.route('/', methods=['GET', 'POST'])
+def webhook():
+    if request.method == 'POST':
+        # Получаем обновление от Telegram
+        update = telebot.types.Update.de_json(request.stream.read().decode('utf-8'))
+        bot.process_new_updates([update])
+        return 'OK', 200
+    return 'Hello, this is your Telegram bot webhook!', 200
+
 # Обработчик команды /start
-async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    user_id = update.message.from_user.id
+@bot.message_handler(commands=['start'])
+def start(message):
+    user_id = message.from_user.id
 
     # Проверяем, не заблокирован ли пользователь
     if is_user_blocked(user_id):
         blocked_until = user_activity[user_id]["blocked_until"]
         remaining_time = int((blocked_until - datetime.now()).total_seconds() // 60)
-        await update.message.reply_text(
+        bot.send_message(
+            message.chat.id,
             f"⏳ Oops! You've sent too many messages. Please wait {remaining_time} minute(s) to continue."
         )
         return
 
     # Создаем клавиатуру с кнопками
-    keyboard = [
-        [KeyboardButton("🎥 Demo Video"), KeyboardButton("💳 Buy Access")],
-        [KeyboardButton("ℹ️ Description")],
-        [KeyboardButton("📢 Updates"), KeyboardButton("📸 Reviews")],
-        [KeyboardButton("📞 Support")]
+    keyboard = telebot.types.ReplyKeyboardMarkup(resize_keyboard=True)
+    buttons = [
+        ["🎥 Demo Video", "💳 Buy Access"],
+        ["ℹ️ Description"],
+        ["📢 Updates", "📸 Reviews"],
+        ["📞 Support", "📋 Proof"]
     ]
-    reply_markup = ReplyKeyboardMarkup(keyboard, resize_keyboard=True)
+    keyboard.add(*[telebot.types.KeyboardButton(button) for row in buttons for button in row])
 
     # Отправляем приветственное сообщение с кнопками
     welcome_message = (
@@ -51,21 +89,23 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
         "From hidden Telegram channels to secret cloud libraries — everything is here for you.\n\n"
         "👇 Choose your destiny below:"
     )
-    await update.message.reply_text(welcome_message, parse_mode="Markdown", reply_markup=reply_markup)
+    bot.send_message(message.chat.id, welcome_message, parse_mode="Markdown", reply_markup=keyboard)
 
     # Обновляем активность пользователя
     track_user_activity(user_id)
 
 # Обработчик текстовых сообщений
-async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    user_id = update.message.from_user.id
-    text = update.message.text
+@bot.message_handler(func=lambda message: True)
+def handle_message(message):
+    user_id = message.from_user.id
+    text = message.text
 
     # Проверяем, не заблокирован ли пользователь
     if is_user_blocked(user_id):
         blocked_until = user_activity[user_id]["blocked_until"]
         remaining_time = int((blocked_until - datetime.now()).total_seconds() // 60)
-        await update.message.reply_text(
+        bot.send_message(
+            message.chat.id,
             f"⏳ Oops! You've sent too many messages. Please wait {remaining_time} minute(s) to continue."
         )
         return
@@ -79,7 +119,7 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
             "[🔗 Download Link](https://drive.proton.me/urls/P6FEHQ3SC0#kKjT5HJFqiJD)\n\n"
             "_Note: Click the link above to download. The key can be copied by clicking on it._"
         )
-        await update.message.reply_text(demo_message, parse_mode="Markdown", disable_web_page_preview=True)
+        bot.send_message(message.chat.id, demo_message, parse_mode="Markdown", disable_web_page_preview=True)
 
     elif text == "💳 Buy Access":
         payment_details = (
@@ -103,7 +143,7 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
             "Your satisfaction is our priority, and we ensure fast support and secure transactions. "
             "Join now and unlock a world of premium content!"
         )
-        await update.message.reply_text(payment_details, parse_mode="Markdown", disable_web_page_preview=True)
+        bot.send_message(message.chat.id, payment_details, parse_mode="Markdown", disable_web_page_preview=True)
 
     elif text == "ℹ️ Description":
         description = (
@@ -115,7 +155,7 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
             "*Access over 4.5 TB of videos and photos in Mega, Yandex.Disk, and Mail.ru cloud storage — download and enjoy at your convenience.*\n\n"
             "*Demo videos are available below by clicking the button. This is only 0.01% of what you'll get!*"
         )
-        await update.message.reply_text(description, parse_mode="Markdown", disable_web_page_preview=True)
+        bot.send_message(message.chat.id, description, parse_mode="Markdown", disable_web_page_preview=True)
 
     elif text == "📢 Updates":
         updates_message = (
@@ -125,11 +165,32 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
             "[📢 Updates Channel](https://t.me/+kdmfbAa8d6YyMTI6)\n\n"
             "_Note: All links in this message are clickable._"
         )
-        await update.message.reply_text(updates_message, parse_mode="Markdown", disable_web_page_preview=False)
+        bot.send_message(message.chat.id, updates_message, parse_mode="Markdown", disable_web_page_preview=False)
 
-    elif text == "📸 Reviews":
-        media_group = [InputMediaPhoto(open(screenshot, "rb")) for screenshot in SCREENSHOTS]
-        await update.message.reply_media_group(media=media_group)
+    elif text == "📸 Reviews":  # Обработка кнопки "📸 Reviews"
+        review_message = (
+            "*📸 User Reviews:*\n"
+            "Here are some screenshots from our satisfied users. Enjoy! 😊"
+        )
+        bot.send_message(message.chat.id, review_message, parse_mode="Markdown")
+
+        media_group = []
+        files = []  # Список для хранения открытых файлов
+
+        for i in range(5):  # Отправляем 5 скриншотов
+            try:
+                file = open(REVIEWS_SCREENSHOTS[i], "rb")
+                files.append(file)  # Добавляем файл в список
+                media_group.append(telebot.types.InputMediaPhoto(file, caption=f"Review Screenshot {i + 1}"))
+            except FileNotFoundError:
+                bot.send_message(message.chat.id, f"❌ File not found: {REVIEWS_SCREENSHOTS[i]}")
+                return
+
+        try:
+            bot.send_media_group(message.chat.id, media_group)
+        finally:
+            for file in files:  # Закрываем все файлы после отправки
+                file.close()
 
     elif text == "📞 Support":
         support_message = (
@@ -138,26 +199,35 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
             "[@vice_cityy](https://t.me/vice_cityy) _(Click to contact)_\n\n"
             "_Note: All links in this message are clickable._"
         )
-        await update.message.reply_text(support_message, parse_mode="Markdown", disable_web_page_preview=True)
+        bot.send_message(message.chat.id, support_message, parse_mode="Markdown", disable_web_page_preview=True)
 
-    elif text == "🔙 Back":
-        keyboard = [
-            [KeyboardButton("🎥 Demo Video"), KeyboardButton("💳 Buy Access")],
-            [KeyboardButton("ℹ️ Description")],
-            [KeyboardButton("📢 Updates"), KeyboardButton("📸 Reviews")],
-            [KeyboardButton("📞 Support")]
-        ]
-        reply_markup = ReplyKeyboardMarkup(keyboard, resize_keyboard=True)
-        welcome_message = (
-            "*🔥 Welcome to the Ultimate Content Hub!* 🔥\n\n"
-            "Unlock the most exclusive and private content you’ve ever seen.\n"
-            "From hidden Telegram channels to secret cloud libraries — everything is here for you.\n\n"
-            "👇 Choose your destiny below:"
+    elif text == "📋 Proof":  # Обработка кнопки "Proof"
+        proof_message = (
+            "*📋 Proof of Content:*\n"
+            "Here are some screenshots to prove the quality of our content. Enjoy! 😊"
         )
-        await update.message.reply_text(welcome_message, parse_mode="Markdown", reply_markup=reply_markup)
+        bot.send_message(message.chat.id, proof_message, parse_mode="Markdown")
+
+        media_group = []
+        files = []  # Список для хранения открытых файлов
+
+        for i in range(3):  # Отправляем 3 скриншота с подписями
+            try:
+                file = open(PROOF_SCREENSHOTS[i], "rb")
+                files.append(file)  # Добавляем файл в список
+                media_group.append(telebot.types.InputMediaPhoto(file, caption=PROOF_CAPTIONS[i]))
+            except FileNotFoundError:
+                bot.send_message(message.chat.id, f"❌ File not found: {PROOF_SCREENSHOTS[i]}")
+                return
+
+        try:
+            bot.send_media_group(message.chat.id, media_group)
+        finally:
+            for file in files:  # Закрываем все файлы после отправки
+                file.close()
 
     else:
-        await update.message.reply_text("⚠️ Unknown command. Please use the buttons below.")
+        bot.send_message(message.chat.id, "⚠️ Unknown command. Please use the buttons below.")
 
 # Функция для отслеживания активности пользователя
 def track_user_activity(user_id):
@@ -189,18 +259,8 @@ def is_user_blocked(user_id):
 
     return False
 
-# Основная функция для запуска бота
-def main():
-    # Создаем приложение
-    application = ApplicationBuilder().token(TOKEN).build()
-
-    # Регистрируем обработчики
-    application.add_handler(CommandHandler("start", start))
-    application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_message))
-
-    # Запускаем бота
-    print("Бот запущен...")
-    application.run_polling()
-
 if __name__ == "__main__":
-    main()
+    # Устанавливаем Webhook при запуске
+    bot.remove_webhook()
+    bot.set_webhook(url=WEBHOOK_URL)
+    app.run(host="0.0.0.0", port=5000)

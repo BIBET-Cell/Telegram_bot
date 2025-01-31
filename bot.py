@@ -1,17 +1,20 @@
+import os
 import telebot
 from flask import Flask, request
 from datetime import datetime, timedelta
 
-# Токен бота (замените на свой)
-TOKEN = '7937428133:AAHlZ911n2Wk8kJla3n28cgJ1zXzhxQWZCM'
+# Получаем токен бота из переменной окружения
+TOKEN = os.getenv("7937428133:AAHlZ911n2Wk8kJla3n28cgJ1zXzhxQWZCM")
+if not TOKEN:
+    raise ValueError("TELEGRAM_TOKEN не найден в переменных окружения!")
 
 # ID администратора (ваш ID)
-ADMIN_CHAT_ID = 6329950188  # Ваш Telegram ID
+ADMIN_CHAT_ID = int(os.getenv("6329950188", "6329950188"))  # Ваш Telegram ID
 
 # Создаем экземпляр бота
 bot = telebot.TeleBot(TOKEN)
 
-# Создаем экземпляр Flask
+# Создаем Flask-сервер
 app = Flask(__name__)
 
 # Словарь для отслеживания активности пользователей
@@ -45,17 +48,19 @@ PROOF_CAPTIONS = [
     "Screenshot 3: Cloud library access."
 ]
 
-# Устанавливаем Webhook
-WEBHOOK_URL = 'https://telegram-bot-vpby.onrender.com/'  # Замените на URL вашего сервиса на Render
+# Базовый маршрут для проверки работы
+@app.route("/", methods=["GET"])
+def home():
+    return "Telegram bot is running! 🚀", 200
 
-@app.route('/', methods=['GET', 'POST'])
+# Маршрут для Webhook
+@app.route("/webhook", methods=["POST"])
 def webhook():
-    if request.method == 'POST':
-        # Получаем обновление от Telegram
-        update = telebot.types.Update.de_json(request.stream.read().decode('utf-8'))
-        bot.process_new_updates([update])
-        return 'OK', 200
-    return 'Hello, this is your Telegram bot webhook!', 200
+    # Получаем обновление от Telegram
+    update = request.get_json()
+    if update:
+        bot.process_new_updates([telebot.types.Update.de_json(update)])
+    return "OK", 200
 
 # Обработчик команды /start
 @bot.message_handler(commands=['start'])
@@ -259,8 +264,16 @@ def is_user_blocked(user_id):
 
     return False
 
+# Запуск сервера на Render
 if __name__ == "__main__":
     # Устанавливаем Webhook при запуске
+    WEBHOOK_URL = os.getenv("https://telegram-bot-2ags.onrender.com")
+    if not WEBHOOK_URL:
+        raise ValueError("WEBHOOK_URL не найден в переменных окружения!")
+
     bot.remove_webhook()
     bot.set_webhook(url=WEBHOOK_URL)
-    app.run(host="0.0.0.0", port=5000)
+
+    # Запускаем Flask-сервер
+    port = int(os.getenv("PORT", 5000))
+    app.run(host="0.0.0.0", port=port)
